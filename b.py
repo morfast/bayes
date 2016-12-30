@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python -u
 
 from sklearn.naive_bayes import GaussianNB
 import sys
@@ -109,6 +109,8 @@ class Frigate_Data():
         print " ====================== "
 
     def cal_features(self):
+        mintime, maxtime = self._timespan_
+        timespan = maxtime - mintime
         n = len(self._ups_)
         # dport
         modval, ratio = modal_value(self._dports_, 3)
@@ -134,8 +136,8 @@ class Frigate_Data():
         # error code
         self._features_ += get_ratio(n, get_dict_values(self._errnos_))
         # pv uv
-        self._features_.append(n)
-        self._features_.append(len(self._sip_))
+        self._features_.append(n/float(timespan))
+        self._features_.append(len(self._sip_)/float(timespan))
         # time info
         self._features_ += get_timeinfo(self._atime_)
 
@@ -152,11 +154,17 @@ def read_frigate_log(logfilenames):
     total_lines = 0
     for logfilename in logfilenames:
         print logfilename
+        min_time = 9999
+        max_time = 0
         for line in open(logfilename):
             spline = line.strip().split("\t")
             # grab features
             atime = spline[0]
             atime_minute = convert_time(atime)
+            if atime_minute < min_time:
+                min_time = atime_minute
+            if atime_minute > max_time:
+                max_time = atime_minute
             trans_proto = spline[2]
             dipport = spline[5]
             dip, dport = dipport.split(':')
@@ -196,6 +204,8 @@ def read_frigate_log(logfilenames):
             total_lines += 1
             if total_lines % 10000 == 0:
                 print "%d lines read" % total_lines
+        for key in res.keys():
+            res[key]._timespan_ = [min_time, max_time]
 
     return res
 
