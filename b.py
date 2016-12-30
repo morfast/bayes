@@ -31,7 +31,7 @@ def modal_value(array, n):
     if length < n:
         res += [-1] * (n - length)
         ratio += [-1] * (n - length)
-    return res + ratio
+    return res, ratio
 
 def basic_int_info(array):
     pass
@@ -110,15 +110,28 @@ class Frigate_Data():
 
     def cal_features(self):
         n = len(self._ups_)
-        self._features_ += modal_value(self._dports_, 3)
-        self._features_ += basic_float_numerical_info(self._ups_)
-        self._features_ += modal_value(self._ups_, 2)
+        # dport
+        modval, ratio = modal_value(self._dports_, 3)
+        self._features_ += modval
+        self._features_ += ratio
+        # ups
+        self._features_ = basic_float_numerical_info(self._ups_)
+        modval, ratio += modal_value(self._ups_, 2)
+        self._features_ += modval
+        self._features_ += ratio
+        # downs
         self._features_ += basic_float_numerical_info(self._downs_)
-        self._features_ += modal_value(self._downs_, 2)
+        modval, ratio = modal_value(self._downs_, 2)
+        self._features_ += modval
+        self._features_ += ratio
+        # duration
         self._features_ += basic_float_numerical_info(self._durations_)
+        # rtt
         self._features_ += basic_float_numerical_info(self._rtts_)
+        # protocols
         self._features_ += get_ratio(n, get_dict_values(self._transport_protos_))
         self._features_ += get_ratio(n, get_dict_values(self._app_protos_))
+        # error code
         self._features_ += get_ratio(n, get_dict_values(self._errnos_))
         # pv uv
         self._features_.append(n)
@@ -229,8 +242,7 @@ def main():
     for key in res:
         res[key].cal_features()
         pres = f.predict([res[key].get_features()])[0]
-        if pres > 0:
-            print key, pres
+        print "-%d- %s" %  (pres, key)
 
 main()
 
