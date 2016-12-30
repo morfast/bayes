@@ -24,9 +24,13 @@ def modal_value(array):
             d[v] = 1
     sorted_pairs = sorted(d.iteritems(), key=lambda d:d[1], reverse = True)
     res = [x[0] for x in sorted_pairs[0:3]]
-    if len(res) < 3:
-        res += [-1] * (3 - len(res))
-    return res
+    times = [x[1] for x in sorted_pairs[0:3]]
+    ratio = [x/float(len(array)) for x in times]
+    length = len(res)
+    if length < 3:
+        res += [-1] * (3 - length)
+        ratio += [-1] * (3 - length)
+    return res + ratio
 
 def basic_int_info(array):
     pass
@@ -39,6 +43,9 @@ def add_feature_dict(d, key):
 def get_dict_values(d):
     sorted_pairs = sorted(d.iteritems(), key=lambda d:d[0])
     return [x[1] for x in sorted_pairs]
+
+def get_ratio(total_num, array):
+    return [x/float(total_num) for x in array]
     
 
 class Frigate_Data():
@@ -84,14 +91,16 @@ class Frigate_Data():
         print " ====================== "
 
     def cal_features(self):
+        n = len(self._ups_)
         self._features_ += modal_value(self._dports_)
         self._features_ += basic_float_numerical_info(self._ups_)
         self._features_ += basic_float_numerical_info(self._downs_)
         self._features_ += basic_float_numerical_info(self._durations_)
         self._features_ += basic_float_numerical_info(self._rtts_)
-        self._features_ += get_dict_values(self._transport_protos_)
-        self._features_ += get_dict_values(self._app_protos_)
-        self._features_ += get_dict_values(self._errnos_)
+        self._features_ += get_ratio(n, get_dict_values(self._transport_protos_))
+        self._features_ += get_ratio(n, get_dict_values(self._app_protos_))
+        self._features_ += get_ratio(n, get_dict_values(self._errnos_))
+        self._features_.append(n)
 
     def print_features(self):
         print len(self._features_), self._features_
