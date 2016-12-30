@@ -5,6 +5,7 @@ import sys
 import numpy
 import math
 import argparse
+import scipy.signal
 
 def basic_float_numerical_info(array):
     minval = min(array)
@@ -15,7 +16,7 @@ def basic_float_numerical_info(array):
 
     return minval, maxval, midval, meanval, stdval
 
-def modal_value(array):
+def modal_value(array, n):
     d = {}
     for v in array:
         if v in d.keys():
@@ -23,13 +24,13 @@ def modal_value(array):
         else:
             d[v] = 1
     sorted_pairs = sorted(d.iteritems(), key=lambda d:d[1], reverse = True)
-    res = [x[0] for x in sorted_pairs[0:3]]
-    times = [x[1] for x in sorted_pairs[0:3]]
+    res = [x[0] for x in sorted_pairs[0:n]]
+    times = [x[1] for x in sorted_pairs[0:n]]
     ratio = [x/float(len(array)) for x in times]
     length = len(res)
-    if length < 3:
-        res += [-1] * (3 - length)
-        ratio += [-1] * (3 - length)
+    if length < n:
+        res += [-1] * (n - length)
+        ratio += [-1] * (n - length)
     return res + ratio
 
 def basic_int_info(array):
@@ -46,13 +47,30 @@ def get_dict_values(d):
 
 def get_ratio(total_num, array):
     return [x/float(total_num) for x in array]
+
+def get_timeinfo(atime_list):
+    freq, power = scipy.signal.periodogram([float(x) for x in atime_list])
+    max_freqs = sorted(zip(freq, power), key = lambda x:x[1], reverse=True)[:3]
+    return [x[0] for x in max_freqs] + [x[1] for x in max_freqs]
+
+def convert_time(timestr):
+    # 2016-10-11 09:11:13 -> 9*60+11
+    x = timestr.split()[1].split(':')
+    h = x[0]
+    m = x[1]
+    return int(h) * 60 + int(m)
+
     
 
 class Frigate_Data():
     def __init__(self):
         # original frigate log infomation
+        # access time
+        self._atime_ = [0] * 1440
         # destination IP
         self._dip_ = ""
+        # source IP
+        self._sip_ = set()
         # destination port
         self._dports_ = []
         # up traffic
@@ -92,15 +110,21 @@ class Frigate_Data():
 
     def cal_features(self):
         n = len(self._ups_)
-        self._features_ += modal_value(self._dports_)
+        self._features_ += modal_value(self._dports_, 3)
         self._features_ += basic_float_numerical_info(self._ups_)
+        self._features_ += modal_value(self._ups_, 2)
         self._features_ += basic_float_numerical_info(self._downs_)
+        self._features_ += modal_value(self._downs_, 2)
         self._features_ += basic_float_numerical_info(self._durations_)
         self._features_ += basic_float_numerical_info(self._rtts_)
         self._features_ += get_ratio(n, get_dict_values(self._transport_protos_))
         self._features_ += get_ratio(n, get_dict_values(self._app_protos_))
         self._features_ += get_ratio(n, get_dict_values(self._errnos_))
+        # pv uv
         self._features_.append(n)
+        self._features_.append(len(self._sip_))
+        # time info
+        self._features_ += get_timeinfo(self._atime_)
 
     def print_features(self):
         print len(self._features_), self._features_
@@ -118,9 +142,13 @@ def read_frigate_log(logfilenames):
         for line in open(logfilename):
             spline = line.strip().split("\t")
             # grab features
+            atime = spline[0]
+            atime_minute = convert_time(atime)
             trans_proto = spline[2]
             dipport = spline[5]
             dip, dport = dipport.split(':')
+            sipport = spline[3]
+            sip, sport = sipport.split(':')
             up_traffic = spline[7]
             down_traffic = spline[8]
             duration = spline[10]
@@ -140,7 +168,9 @@ def read_frigate_log(logfilenames):
             # update the features
             assert(dip == fdata._dip_)
             add_feature_dict(fdata._transport_protos_, trans_proto)
+            fdata._atime_[atime_minute] += 1
             fdata._dports_.append(int(dport))
+            fdata._sip_.add(sip)
             fdata._ups_.append(float(up_traffic))
             fdata._downs_.append(float(down_traffic))
             fdata._durations_.append(float(duration))
