@@ -4,6 +4,7 @@ from sklearn.naive_bayes import GaussianNB
 import sys
 import numpy
 import math
+import argparse
 
 def basic_float_numerical_info(array):
     minval = min(array)
@@ -97,13 +98,14 @@ class Frigate_Data():
 
     def get_features(self):
         return self._features_
-        
+
         
 
 def read_frigate_log(logfilenames):
     res = {}
     total_lines = 0
     for logfilename in logfilenames:
+        print logfilename
         for line in open(logfilename):
             spline = line.strip().split("\t")
             # grab features
@@ -154,25 +156,42 @@ def test():
     print f.predict([2,3])
     print f.predict([12,13])
 
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-t", "--train", action='store', nargs='*')
+    parser.add_argument("-d", "--data", action='store', nargs='*')
+    a = parser.parse_args()
+    return a.train, a.data
+
 def main():
-    res = read_frigate_log([sys.argv[1]])
-    safeip_feature_list = []
-    for key in res:
-        res[key].cal_features()
-        safeip_feature_list.append(res[key].get_features())
+    train_filenames, data_filenames = parse_arguments()
+    if not train_filenames or not data_filenames:
+        sys.exit(0)
 
-    res = read_frigate_log([sys.argv[2]])
-    probe_feature_list = []
-    for key in res:
-        res[key].cal_features()
-        probe_feature_list.append(res[key].get_features())
+    # read the training sets
+    X = []
+    Y = []
+    for filename in train_filenames:
+        res = read_frigate_log([filename])
+        for key in res:
+            res[key].cal_features()
+            X.append(res[key].get_features())
+        # get Y value from the filename
+        filename = filename.split('/')[-1]
+        y_value = int(filename.split('_')[0])
+        Y += ([y_value] * len(res))
 
+    # training
     gnb = GaussianNB()
-    X = safeip_feature_list + probe_feature_list
-    Y = [0] * len(safeip_feature_list) + [1] * len(probe_feature_list)
     f = gnb.fit(X,Y)
-    print f.predict(safeip_feature_list[2])
-    print f.predict(probe_feature_list[1])
 
+    # judge
+    res = read_frigate_log(data_filenames)
+    for key in res:
+        res[key].cal_features()
+        pres = f.predict([res[key].get_features()])[0]
+        if pres > 0:
+            print key, pres
 
 main()
+
