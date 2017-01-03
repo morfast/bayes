@@ -1,6 +1,9 @@
 #!/usr/bin/python -u
 
 from sklearn.naive_bayes import GaussianNB
+from sklearn.neural_network import MLPClassifier
+from sklearn import tree
+from sklearn import svm
 import sys
 import numpy
 import math
@@ -265,8 +268,11 @@ def main():
     # training
     print "training..."
     print "size of training set: %d" % (len(X))
-    gnb = GaussianNB()
-    f = gnb.fit(X,Y)
+    #clf = GaussianNB()
+    #clf = MLPClassifier()
+    clf = tree.DecisionTreeClassifier()
+    #clf = svm.SVC()
+    f = clf.fit(X,Y)
 
     # judge
     res = read_frigate_log(data_filenames)
