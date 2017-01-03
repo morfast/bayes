@@ -93,6 +93,9 @@ class Frigate_Data():
         # features
         self._features_ = []
 
+        # type
+        self._type_ = -1
+
 
     def print_original_logs(self):
         print " ====================== "
@@ -170,8 +173,8 @@ def read_frigate_log(logfilenames):
             dip, dport = dipport.split(':')
             sipport = spline[3]
             sip, sport = sipport.split(':')
-            up_traffic = spline[7]
-            down_traffic = spline[8]
+            up_traffic = spline[6]
+            down_traffic = spline[7]
             duration = spline[10]
             handshake_rtt = spline[13]
             app_proto = spline[16]
@@ -225,25 +228,43 @@ def parse_arguments():
     a = parser.parse_args()
     return a.train, a.data
 
+def write_feature(fridata, tfile):
+    tfile.write("-%d- %s " % (fridata._type_, fridata._dip_))
+    tfile.write(" ".join(["%15.2f" % (float(x)) for x in fridata.get_features()]))
+    tfile.write("\n")
+    
+
 def main():
     train_filenames, data_filenames = parse_arguments()
     if not train_filenames or not data_filenames:
         sys.exit(0)
 
+    # open files
+    trainset_file = open("train.data", "w")
+    dataset_file = open("data.data", "w")
+
     # read the training sets
     X = []
     Y = []
     for filename in train_filenames:
+        # get Y value from the filename
+        basefilename = filename.split('/')[-1]
+        y_value = int(basefilename.split('_')[0])
+        # read training file
         res = read_frigate_log([filename])
         for key in res:
+            #res[key].print_original_logs()
             res[key].cal_features()
             X.append(res[key].get_features())
-        # get Y value from the filename
-        filename = filename.split('/')[-1]
-        y_value = int(filename.split('_')[0])
+            res[key]._type_ = y_value
+            # write the training set to file
+            write_feature(res[key], trainset_file)
         Y += ([y_value] * len(res))
 
+
     # training
+    print "training..."
+    print "size of training set: %d" % (len(X))
     gnb = GaussianNB()
     f = gnb.fit(X,Y)
 
@@ -252,7 +273,9 @@ def main():
     for key in res:
         res[key].cal_features()
         pres = f.predict([res[key].get_features()])[0]
+        res[key]._type_ = pres
         print "-%d- %s" %  (pres, key)
+        write_feature(res[key], dataset_file)
 
 main()
 
