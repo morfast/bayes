@@ -2,6 +2,7 @@
 
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neural_network import MLPClassifier
+from sklearn.linear_model import SGDClassifier
 from sklearn import tree
 from sklearn import svm
 import sys
@@ -271,6 +272,8 @@ def main():
     #clf = GaussianNB()
     #clf = MLPClassifier()
     clf = tree.DecisionTreeClassifier()
+    #clf = SGDClassifier()
+    #clf = SGDClassifier(loss="hinge", penalty="l2")
     #clf = svm.SVC()
     f = clf.fit(X,Y)
 
