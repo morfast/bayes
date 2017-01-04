@@ -5,11 +5,14 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import SGDClassifier
 from sklearn import tree
 from sklearn import svm
+
 import sys
 import numpy
 import math
 import argparse
 import scipy.signal
+import time 
+import cPickle
 
 def basic_float_numerical_info(array):
     minval = min(array)
@@ -154,6 +157,15 @@ class Frigate_Data():
     def get_features(self):
         return self._features_
 
+class parameters():
+    def __init__(self):
+        self._train_filenames_ = []
+        self._data_filenames_ = []
+        self._save_trainset_filename_ = ""
+        self._load_trainset_filename_ = ""
+        self._save_data_filename_ = ""
+        self._load_data_filename_ = ""
+
         
 
 def read_frigate_log(logfilenames):
@@ -209,7 +221,7 @@ def read_frigate_log(logfilenames):
             add_feature_dict(fdata._errnos_, int(errro_code))
 
             total_lines += 1
-            if total_lines % 10000 == 0:
+            if total_lines % 100000 == 0:
                 print "%d lines read" % total_lines
         for key in res.keys():
             res[key]._timespan_ = [min_time, max_time]
@@ -229,41 +241,80 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--train", action='store', nargs='*')
     parser.add_argument("-d", "--data", action='store', nargs='*')
-    a = parser.parse_args()
-    return a.train, a.data
+    parser.add_argument("-l", "--lt", action='store', nargs='*')
+    parser.add_argument("-L", "--st", action='store', nargs='*')
+    parser.add_argument("-s", "--ld", action='store', nargs='*')
+    parser.add_argument("-S", "--sd", action='store', nargs='*')
+
+    args =  parser.parse_args()
+
+    if not args.train and not args.lt:
+        sys.stderr.write("No traning set?\n")
+        sys.exit(0)
+
+    if args.train and args.lt:
+        sys.stderr.write("double traning set?\n")
+        sys.exit(0)
+
+    if not args.data and not args.ld:
+        sys.stderr.write("No data?\n")
+        sys.exit(0)
+
+    if args.data and args.ld:
+        sys.stderr.write("double data?\n")
+        sys.exit(0)
+
+    return args
 
 def write_feature(fridata, tfile):
     tfile.write("-%d- %s " % (fridata._type_, fridata._dip_))
     tfile.write(" ".join(["%15.2f" % (float(x)) for x in fridata.get_features()]))
     tfile.write("\n")
+
     
 
 def main():
-    train_filenames, data_filenames = parse_arguments()
-    if not train_filenames or not data_filenames:
-        sys.exit(0)
+    args = parse_arguments()
 
     # open files
     trainset_file = open("train.data", "w")
     dataset_file = open("data.data", "w")
 
-    # read the training sets
-    X = []
-    Y = []
-    for filename in train_filenames:
-        # get Y value from the filename
-        basefilename = filename.split('/')[-1]
-        y_value = int(basefilename.split('_')[0])
-        # read training file
-        res = read_frigate_log([filename])
-        for key in res:
-            #res[key].print_original_logs()
-            res[key].cal_features()
-            X.append(res[key].get_features())
-            res[key]._type_ = y_value
-            # write the training set to file
-            write_feature(res[key], trainset_file)
-        Y += ([y_value] * len(res))
+    t0 = time.clock()
+    if args.train:
+        # read the training sets X and Y from frigate log
+        X = []
+        Y = []
+        for filename in args.train:
+            # get Y value from the filename
+            basefilename = filename.split('/')[-1]
+            y_value = int(basefilename.split('_')[0])
+            # read training file
+            res = read_frigate_log([filename])
+            for key in res:
+                #res[key].print_original_logs()
+                res[key].cal_features()
+                X.append(res[key].get_features())
+                res[key]._type_ = y_value
+                # write the training set to file
+                write_feature(res[key], trainset_file)
+            Y += ([y_value] * len(res))
+        if args.st:
+            # save the feature list
+            print "save the feature list of the training set to %s" % (args.st[0])
+            stfile = open(args.st[0], "w")
+            cPickle.dump((X,Y), stfile)
+            stfile.close()
+
+    else:
+        # read the training sets X and Y from python Pickle file
+        print "read training set from %s" % (args.lt[0])
+        X, Y = cPickle.load(open(args.lt[0]))
+
+    t1 = time.clock()
+    print "time of reading trainset: ", t1 - t0
+    t0 = time.clock()
+
 
 
     # training
@@ -275,16 +326,37 @@ def main():
     #clf = SGDClassifier()
     #clf = SGDClassifier(loss="hinge", penalty="l2")
     #clf = svm.SVC()
-    f = clf.fit(X,Y)
+    fit_res = clf.fit(X,Y)
+
+    t1 = time.clock()
+    print "time of fitting: ", t1 - t0
+    t0 = time.clock()
 
     # judge
-    res = read_frigate_log(data_filenames)
+    if args.data:
+        res = read_frigate_log(args.data)
+        if args.sd:
+            print "save data to %s" % (args.sd[0])
+            f = open(args.sd[0], "w")
+            cPickle.dump(res, f)
+            f.close()
+    else:
+        print "read data from %s" % (args.ld[0])
+        res = cPickle.load(open(args.ld[0]))
+
+    t1 = time.clock()
+    print "time of reading dataset: ", t1 - t0
+    t0 = time.clock()
+
     for key in res:
         res[key].cal_features()
-        pres = f.predict([res[key].get_features()])[0]
+        pres = fit_res.predict([res[key].get_features()])[0]
         res[key]._type_ = pres
         print "-%d- %s" %  (pres, key)
         write_feature(res[key], dataset_file)
+
+    t1 = time.clock()
+    print "time of predicting: ", t1 - t0
 
 main()
 
