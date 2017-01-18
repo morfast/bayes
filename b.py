@@ -7,6 +7,7 @@ from sklearn import tree
 from sklearn import svm
 from sklearn.feature_selection import SelectKBest
 from sklearn.feature_selection import chi2
+from sklearn.model_selection import train_test_split
 
 import sys
 import numpy
@@ -247,6 +248,7 @@ def parse_arguments():
     parser.add_argument("-L", "--st", action='store', nargs='*')
     parser.add_argument("-s", "--ld", action='store', nargs='*')
     parser.add_argument("-S", "--sd", action='store', nargs='*')
+    parser.add_argument("-o", "--to", action='store', nargs='*')
 
     args =  parser.parse_args()
 
@@ -258,7 +260,7 @@ def parse_arguments():
         sys.stderr.write("double traning set?\n")
         sys.exit(0)
 
-    if not args.data and not args.ld:
+    if not args.data and not args.ld and not args.to:
         sys.stderr.write("No data?\n")
         sys.exit(0)
 
@@ -273,6 +275,17 @@ def write_feature(fridata, tfile):
     tfile.write(" ".join(["%15.2f" % (float(x)) for x in fridata.get_features()]))
     tfile.write("\n")
 
+def test_accuracy(data, target):
+    data_train, data_test, target_train, target_test \
+              = train_test_split(data, target)
+    clf = GaussianNB()
+    #clf = MLPClassifier()
+    #clf = tree.DecisionTreeClassifier()
+    #clf = SGDClassifier()
+    #clf = SGDClassifier(loss="hinge", penalty="l2")
+    #clf = svm.SVC()
+    fit_res = clf.fit(data_train, target_train)
+    return fit_res.score(data_test, target_test)
     
 
 def main():
@@ -321,7 +334,14 @@ def main():
     # feature selection
     # X = SelectKBest(chi2, k=8).fit_transform(X, Y)
 
+    # test
+    if args.to:
+        score = test_accuracy(X, Y)
+        print "score: ", score
+        sys.exit(0)
+
     # training
+    # X is the data, and Y is the target
     print "training..."
     print "size of training set: %d" % (len(X))
     clf = GaussianNB()
