@@ -5,6 +5,8 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import SGDClassifier
 from sklearn import tree
 from sklearn import svm
+from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import chi2
 
 import sys
 import numpy
@@ -36,8 +38,8 @@ def modal_value(array, n):
     ratio = [x/float(len(array)) for x in times]
     length = len(res)
     if length < n:
-        res += [-1] * (n - length)
-        ratio += [-1] * (n - length)
+        res += [0] * (n - length)
+        ratio += [0] * (n - length)
     return res, ratio
 
 def basic_int_info(array):
@@ -316,13 +318,15 @@ def main():
     t0 = time.clock()
 
 
+    # feature selection
+    # X = SelectKBest(chi2, k=8).fit_transform(X, Y)
 
     # training
     print "training..."
     print "size of training set: %d" % (len(X))
-    #clf = GaussianNB()
+    clf = GaussianNB()
     #clf = MLPClassifier()
-    clf = tree.DecisionTreeClassifier()
+    #clf = tree.DecisionTreeClassifier()
     #clf = SGDClassifier()
     #clf = SGDClassifier(loss="hinge", penalty="l2")
     #clf = svm.SVC()
